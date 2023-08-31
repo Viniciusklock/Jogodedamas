@@ -6,79 +6,90 @@ import pygame
 from backend.geral.config import *
 from backend.modelo.jogador import Jogador
 
-# posições iniciais da bola
-x = 320
-y = 320
-
-# tentar carregar x e y
-with app.app_context():
-    try:
-        obj = db.session.get(Jogador, 1) # carrega o jogador
-        x = obj.x
-        y = obj.y
-    except Exception as e:
-        print("Não foi possível carregar informações: "+str(e))
-
+# Inicialização do Pygame
 pygame.init()
 
-screen = pygame.display.set_mode((1280,720))
+# Configurações da tela
+width, height = 400, 400
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Jogo de Damas")
 
+# Cores
+white = (255, 255, 255)
+black = (0, 0, 0)
+red = (255, 0, 0)
+
+# Variáveis do tabuleiro
+board_size = 8
+tile_size = width // board_size
+
+# Criação do tabuleiro
+board = [[None for _ in range(board_size)] for _ in range(board_size)]
+
+# Preenche o tabuleiro com peças iniciais
+for row in range(board_size):
+    for col in range(board_size):
+        if (row + col) % 2 == 1:
+            if row < 3:
+                board[row][col] = "peça_preta"
+            elif row > 4:
+                board[row][col] = "peça_branca"
+
+# Função para desenhar o tabuleiro
+def draw_board():
+    for row in range(board_size):
+        for col in range(board_size):
+            color = white if (row + col) % 2 == 0 else black
+            pygame.draw.rect(screen, color, (col * tile_size, row * tile_size, tile_size, tile_size))
+
+# Função para desenhar as peças
+def draw_pieces():
+    for row in range(board_size):
+        for col in range(board_size):
+            piece = board[row][col]
+            if piece == "peça_preta":
+                pygame.draw.circle(screen, black, (col * tile_size + tile_size // 2, row * tile_size + tile_size // 2), tile_size // 3)
+            elif piece == "peça_branca":
+                pygame.draw.circle(screen, white, (col * tile_size + tile_size // 2, row * tile_size + tile_size // 2), tile_size // 3)
+
+# Variáveis para controle de turno e seleção de peça
+current_turn = "peça_branca"
+selected_piece = None
+
+# Função para atualizar o tabuleiro com os movimentos
+def update_board(row, col):
+    board[row][col] = selected_piece
+    board[selected_piece_row][selected_piece_col] = None
+
+# Loop principal do jogo
+running = True
 clock = pygame.time.Clock()
 
-
-# criar/carregar fonte
-font = pygame.font.Font('freesansbold.ttf', 32)
-# criar um texto
-text = font.render('Pressione Q para finalizar', True, (100, 100, 100), (11, 11, 11))
-# definir retângulo no qual vai aparecer o texto
-# pega o do próprio texto
-text_rect = text.get_rect()
-
-running = True
 while running:
-    
-    # Process player inputs.
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            pygame.quit()
-            raise SystemExit     
+            running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Clique esquerdo do mouse
+            col = event.pos[0] // tile_size
+            row = event.pos[1] // tile_size
+            piece = board[row][col]
 
-    # Do logical updates here.
-    # ...
+            if piece == selected_piece:
+                selected_piece = None
+            elif selected_piece is None:
+                selected_piece = piece
+                selected_piece_row = row
+                selected_piece_col = col
+            elif piece is None and selected_piece is not None:
+                update_board(row, col)
+                selected_piece = None
+                current_turn = "peça_branca" if current_turn == "peça_preta" else "peça_preta"
 
-    # outra forma de capturar eventos de teclado :-)
-    # esta verificação fica FORA da seção sugerida para processar eventos :-/
-    # https://stackoverflow.com/questions/16044229/how-to-get-keyboard-input-in-pygame
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:
-        x -= 1
-    if keys[pygame.K_RIGHT]:
-        x += 1
-    if keys[pygame.K_UP]:
-        y -= 1
-    if keys[pygame.K_DOWN]:
-        y += 1
-    if keys[pygame.K_q]:
-        running = False
+    screen.fill(black)
+    draw_board()
+    draw_pieces()
 
-    screen.fill("purple")  # Fill the display with a solid color
+    pygame.display.flip()
+    clock.tick(60)
 
-    # coloca o texto na tela
-    screen.blit(text, text_rect)
-
-    pygame.draw.circle(screen, (10, 10, 10), [x, y], 15, 5)
-
-    # Render the graphics here.
-    # ...
-
-    pygame.display.flip()  # Refresh on-screen display
-    clock.tick(60)         # wait until next frame (at 60 FPS)
-
-    # salvar os dados
-    with app.app_context():
-        obj = db.session.get(Jogador, 1) # carrega o jogador
-        obj.x = x # atualiza coordenadas
-        obj.y = y
-        db.session.commit() # salva!
-
-print("Jogo encerrado e informações salvas")
+pygame.quit()
